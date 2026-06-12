@@ -1,0 +1,234 @@
+---
+title: "Buchempfehlungen mit dem Apriori-Algorithmus"
+subtitle: "Demonstration am Beispiel des Book-Crossing-Datensatzes"
+author: "Tom Alby"
+date: today
+lang: de
+format:
+  html:
+    embed-resources: true
+    toc: true
+    code-fold: false
+execute:
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+#| output: false
+# install.packages(c("arules", "arulesViz"))  # einmalig
+library(arules)
+```
+
+## Die Idee: Warenkorbanalyse für Bücher
+
+Der Apriori-Algorithmus (Agrawal & Srikant, 1994) sucht **häufige Itemsets** in
+Transaktionsdaten und leitet daraus **Assoziationsregeln** ab — klassisch:
+„Wer Windeln kauft, kauft auch Bier." Übertragen auf Book-Crossing:
+
+> Eine **Transaktion** = alle Bücher, die ein:e Nutzer:in bewertet hat.
+> Eine **Regel** = „Wer *Angels & Demons* gelesen hat, hat oft auch
+> *The Da Vinci Code* gelesen."
+
+Das ist Data Mining im Sinne von Mandl (Kap. 2): Mustersuche in strukturierten
+Daten, **unüberwacht** — wir geben keine Zielvariable vor, der Algorithmus
+findet die Muster selbst.
+
+## Die drei Kennzahlen von Hand
+
+Bevor wir den Algorithmus laufen lassen, das Prinzip an einem
+Mini-Beispiel mit 8 Leser:innen:
+
+```{r}
+#| label: mini-beispiel
+mini <- list(
+  u1 = c("Da Vinci Code", "Angels & Demons"),
+  u2 = c("Da Vinci Code", "Angels & Demons", "Life of Pi"),
+  u3 = c("Da Vinci Code", "Life of Pi"),
+  u4 = c("Angels & Demons", "Da Vinci Code"),
+  u5 = c("Life of Pi"),
+  u6 = c("Da Vinci Code"),
+  u7 = c("Angels & Demons", "Da Vinci Code"),
+  u8 = c("Life of Pi", "Bridget Jones")
+)
+```
+
+Betrachten wir die Regel **{Angels & Demons} → {Da Vinci Code}**:
+
+* **Support** = Anteil der Transaktionen, die *beide* Bücher enthalten:
+  4 von 8 = **0,5**
+* **Konfidenz** = Wie oft die Regel zutrifft, *wenn* die linke Seite vorliegt:
+  4 von 4 Angels-&-Demons-Leser:innen haben auch Da Vinci Code = **1,0**
+* **Lift** = Konfidenz geteilt durch die Basisrate von Da Vinci Code (6/8 = 0,75):
+  1,0 / 0,75 = **1,33** — Angels-&-Demons-Leser:innen lesen Da Vinci Code
+  1,33-mal häufiger als der Durchschnitt. Lift > 1 heißt: echter Zusammenhang,
+  nicht nur Popularität.
+
+Dasselbe mit `arules`:
+
+```{r}
+#| label: mini-arules
+trans_mini <- as(mini, "transactions")
+regeln_mini <- apriori(trans_mini,
+  parameter = list(supp = 0.3, conf = 0.7, minlen = 2),
+  control = list(verbose = FALSE))
+inspect(sort(regeln_mini, by = "lift"))
+```
+
+**Warum heißt es „Apriori"?** Der Algorithmus nutzt das
+Apriori-Prinzip: Wenn {A, B} selten ist, kann {A, B, C} nicht häufig sein.
+So muss er nicht alle $2^n$ Buchkombinationen prüfen — bei 271.000 Büchern
+im Book-Crossing-Datensatz wäre das sonst hoffnungslos.
+
+## Ein Book-Crossing-ähnlicher Datensatz
+
+Für die Demonstration simulieren wir 400 Nutzer:innen mit realistischen
+Lesemustern: drei Genre-Cluster (Dan-Brown-Thriller, Harry Potter,
+Frauenromane der frühen 2000er) plus Rauschen. Die Titel sind echte
+Bestseller aus dem Book-Crossing-Datensatz — inklusive **Wild Animus**,
+dem meistbewerteten Buch des Datensatzes (es wurde damals massenhaft
+kostenlos verteilt, was wir mit einer 35-%-Wahrscheinlichkeit nachbilden).
+
+```{r}
+#| label: simulation
+set.seed(42)
+
+thriller <- c("The Da Vinci Code", "Angels & Demons",
+              "Digital Fortress", "Deception Point")
+potter   <- c("Harry Potter und der Stein der Weisen",
+              "Harry Potter und die Kammer des Schreckens",
+              "Harry Potter und der Gefangene von Askaban")
+romane   <- c("The Secret Life of Bees",
+              "Divine Secrets of the Ya-Ya Sisterhood",
+              "The Lovely Bones", "Where the Heart Is")
+diverse  <- c("Wild Animus", "Life of Pi", "The Catcher in the Rye",
+              "A Painted House", "Bridget Jones's Diary", "The Firm")
+
+n <- 400
+koerbe <- vector("list", n)
+for (i in seq_len(n)) {
+  b <- character(0)
+  r <- runif(1)
+  if (r < 0.30) {                                  # Thriller-Fan
+    b <- sample(thriller, sample(c(2, 3, 3, 4), 1))
+  } else if (r < 0.55) {                           # Potter-Fan
+    b <- sample(potter, sample(c(2, 3, 3), 1))
+  } else if (r < 0.80) {                           # Romane-Fan
+    b <- sample(romane, sample(c(2, 3, 3), 1))
+  }                                                # sonst: nur Diverses
+  b <- union(b, sample(diverse, sample(c(0, 1, 1, 2), 1)))
+  if (runif(1) < 0.35) b <- union(b, "Wild Animus")
+  koerbe[[i]] <- b
+}
+koerbe <- koerbe[lengths(koerbe) >= 2]   # Nutzer mit < 2 Büchern raus
+trans  <- as(koerbe, "transactions")
+summary(trans)
+```
+
+Welche Bücher kommen am häufigsten vor?
+
+```{r}
+#| label: itemfreq
+#| fig-height: 4
+itemFrequencyPlot(trans, topN = 10, cex.names = 0.7,
+                  main = "Häufigste Bücher im simulierten Datensatz")
+```
+
+Wild Animus liegt vorn — **hoher Support sagt nichts über
+Empfehlungsqualität**. Genau dafür brauchen wir Konfidenz und Lift.
+
+## Apriori laufen lassen
+
+```{r}
+#| label: apriori
+regeln <- apriori(trans,
+  parameter = list(supp = 0.05, conf = 0.6, minlen = 2),
+  control = list(verbose = FALSE))
+regeln
+```
+
+Die Top-Regeln nach Lift:
+
+```{r}
+#| label: top-regeln
+inspect(head(sort(regeln, by = "lift"), 10))
+```
+
+Drei Beobachtungen, die sich für die Diskussion eignen:
+
+1. **Die Genre-Cluster werden sauber gefunden** — Harry-Potter-Bände
+   sagen einander mit Konfidenz über 0,9 voraus, die Dan-Brown-Titel
+   bilden ein eigenes Regelbündel. Der Algorithmus „kennt" keine Genres,
+   er findet sie in den Co-Occurrences.
+2. **Wild Animus taucht in vielen Regeln als Beifang auf** (hoher Support),
+   aber Regeln, die *nur* auf Wild Animus basieren, haben einen Lift nahe 1 —
+   Popularität ohne Zusammenhang:
+
+```{r}
+#| label: wild-animus
+wa <- subset(regeln, lhs %in% "Wild Animus" & size(lhs) == 1)
+inspect(sort(wa, by = "lift"))
+```
+
+3. **Empfehlung in der Praxis:** Für Nutzer:innen, die
+   *The Secret Life of Bees* gelesen haben, lassen sich die passenden
+   Regeln direkt abfragen:
+
+```{r}
+#| label: empfehlung
+empf <- subset(regeln, lhs %ain% "The Secret Life of Bees")
+inspect(head(sort(empf, by = "confidence"), 5))
+```
+
+## Auf den echten Daten (zu Hause nachrechnen)
+
+Der gleiche Code funktioniert auf dem echten Book-Crossing-Datensatz —
+mit den in der Konsultation besprochenen Datenqualitäts-Hürden.
+Dieser Chunk wird hier nicht ausgeführt:
+
+```{r}
+#| label: echte-daten
+#| eval: false
+ratings <- read.csv("BX-Book-Ratings.csv", sep = ";",
+                    fileEncoding = "latin1")
+books   <- read.csv("BX-Books.csv", sep = ";",
+                    fileEncoding = "latin1", quote = "\"")
+
+# Wichtig: Rating 0 ist implizit (erfasst, nicht bewertet).
+# Für "hat gelesen" können wir alle Zeilen nutzen; für "mochte"
+# nur explizite Ratings, z. B. >= 7:
+gelesen <- merge(ratings, books[, c("ISBN", "Book.Title")], by = "ISBN")
+
+koerbe_real <- split(gelesen$Book.Title, gelesen$User.ID)
+koerbe_real <- lapply(koerbe_real, unique)          # ISBN-Dubletten!
+koerbe_real <- koerbe_real[lengths(koerbe_real) >= 2]
+trans_real  <- as(koerbe_real, "transactions")
+
+# Achtung Sparsity: bei 271.000 Büchern muss der Support winzig sein,
+# sonst findet Apriori nichts. Mit der Stellschraube supp experimentieren:
+regeln_real <- apriori(trans_real,
+  parameter = list(supp = 0.001, conf = 0.5, minlen = 2))
+inspect(head(sort(regeln_real, by = "lift"), 20))
+```
+
+Erwartbare Befunde auf den echten Daten: Buchserien (Harry Potter,
+Herr der Ringe, Left Behind) dominieren die Top-Regeln, Wild Animus hat
+den höchsten Support bei mieser Bewertung, und ohne `unique()` und
+ISBN-Bereinigung empfehlen wir Leuten dasselbe Buch in anderer Auflage.
+
+## Grenzen — Diskussionsstoff
+
+* **Apriori personalisiert nicht wirklich:** Es findet globale Regeln,
+  kein individuelles Profil. Collaborative Filtering geht einen Schritt
+  weiter (Ähnlichkeit zwischen Nutzer:innen statt fester Regeln).
+* **Cold Start:** Für neue Bücher ohne Bewertungen gibt es keine Regeln.
+* **Feedback-Schleife:** Empfehle ich nur Häufiges, wird Häufiges noch
+  häufiger — wollen Bibliotheken das, oder ist Serendipität ein eigener Wert?
+* **Datenschutz:** Transaktionen = Ausleihhistorien. Was unterscheidet
+  unser Vorgehen von Amazon — und was sollte es unterscheiden?
+
+---
+
+*Reproduzierbar mit `quarto render apriori_buchempfehlungen.qmd` —
+benötigt R mit dem Paket `arules`.*
