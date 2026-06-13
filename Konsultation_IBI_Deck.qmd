@@ -15,99 +15,90 @@ library(arules)
 library(tidyverse)
 ```
 
-# Block 1: Konzepte klären
+# Konzepte klären
 
 ## Ziele dieser Konsultation
 
 - Offene Fragen zu den Materialien klären
-- Die Begriffe sauber sortieren: KI, ML, Data Science, Data Mining
-- Book-Crossing: vom rohen Datensatz zur Buchempfehlung
+- Die Begriffe sauber sortieren: KI, ML, LLMs, Data Science, Data Mining
+- Data Mining mit dem BookCrossing-Datensatz
 
 ## Ablauf heute
 
-| Block | Inhalt |
-|-------|--------------------------------------------------|
-| 1     | Begriffe, KI-Geschichte, CRISP-DM                |
-| Pause |                                                  |
-| 2     | Book-Crossing: Datenqualität & Apriori           |
+| Block | Inhalt               |
+|-------|----------------------|
+| 1     | Begriffe & Konzepte  |
+| Pause |                      |
+| 2     | Hands-on Data Mining |
 
 ## Logistik
 
 - **Fragen:** Bitte unterbrechen Sie mich für Fragen
 - **Kontakt:** [tom\@alby.de](mailto:tom@alby.de)
+- Material auf GitHub (Link im Moodle)
 
 ## Womit starten wir?
 
 - Welche Materialien haben Sie durchgearbeitet?
 - Wo hakte es?
 
-
 ## Die Begriffe sortiert
 
-- **KI**: Oberbegriff — Maschinen tun Dinge, die Intelligenz erfordern
-- **Machine Learning**: Teilmenge der KI — Lernen aus Daten statt fester Regeln
-- **Data Mining**: Mustersuche in (strukturierten) Daten — der Prozess
-- **Text Mining**: dasselbe für unstrukturierte Texte
-- **Data Science**: die Disziplin drumherum — inkl. Business Understanding, Kommunikation, Deployment
+- **KI:** Maschinen verhalten sich intelligent.
+- **Machine Learning:** Teilmenge der KI, Systeme lernen selbstständig aus Daten.
+- **LLMs:** Spezialform von ML, Modelle, die menschliche Sprache "verstehen" und generieren.
+- **Data Mining:** Mustererkennung in strukturierten Daten.
+- **Text Mining:** Mustererkennung in unstrukturierten Texten
+- **Data Science:** Die Disziplin drumherum, von der Analyse bis zum Business-Einsatz.
+
+## Standortbestimmung
+
+- Wo begegnen / nutzen Sie KI / Data Mining heute schon?
+- Wo würden Sie gerne KI / Data Mining nutzen?
+- Welche KI-Versprechen hören Bibliotheken aktuell von Anbietern?
 
 ## Diskussion
 
 - Mandl: Data Mining = strukturierte Daten, Text Mining = unstrukturierte Texte
-- **Wo liegen Bibliothekskataloge auf diesem Spektrum?**
+- Wo liegen Bibliothekskataloge auf diesem Spektrum?
 - Metadaten vs. Abstracts vs. Volltexte
 
-## AI Springs & Winters
+## Der BookCrossing-Datensatz
 
-- 1950er/60er: erster Frühling — Turing, Dartmouth, große Versprechen
-- 1970er: erster Winter — die Versprechen platzen
-- 1980er: Expertensysteme — und der zweite Winter
-- Heute: dritter Frühling?
-- **Woran würden Sie den nächsten Winter erkennen?**
+- 2004 von Cai-Nicolas Ziegler aus der BookCrossing-Community gecrawlt
+- Demos in diesem Deck nutzen ein Teilsample (\~494.000 Bewertungen):
 
-## Transfer in die Bibliothekswelt
+## Der BookCrossing-Datensatz
 
-- Welche KI-Versprechen hören Bibliotheken aktuell von Anbietern?
-- KI-gestützte Erschließung, Chatbots, Discovery
+| Datei           | Inhalt                           | Größe                   |
+|-------------------|----------------------------------|-------------------|
+| BX-Users        | User-ID, Location, Age           | \~278.000 Nutzer:innen  |
+| BX-Books        | ISBN, Titel, Autor, Jahr, Verlag | \~271.000 Bücher        |
+| BX-Book-Ratings | User-ID, ISBN, Rating 0–10       | \~1,15 Mio. Bewertungen |
 
+## CRISP-DM
 
+![](images/CRISP-DM_Process_Diagram.png)
 
+## Was stimmt mit diesen Daten nicht?
 
-## Der Book-Crossing-Datensatz
-
-2004 von Cai-Nicolas Ziegler aus der BookCrossing-Community gecrawlt — die
-Demos in diesem Deck nutzen ein Teilsample (~494.000 Bewertungen):
-
-| Datei | Inhalt | Größe |
-|-----------------|--------------------------------|-----------------|
-| BX-Users | User-ID, Location, Age | ~278.000 Nutzer:innen |
-| BX-Books | ISBN, Titel, Autor, Jahr, Verlag | ~271.000 Bücher |
-| BX-Book-Ratings | User-ID, ISBN, Rating 0–10 | ~1,15 Mio. Bewertungen |
-
-## Übung: Was stimmt mit diesen Daten nicht? (15 Min)
-
-- Gruppe 1: BX-Users
-- Gruppe 2: BX-Books
-- Gruppe 3: BX-Book-Ratings
-
-
-## Auflösung: die üblichen Verdächtigen
-
-- **Ratings:** 0 ist kein Verriss, sondern **implizit** — über die Hälfte aller Einträge!
+- **Ratings:** 0 ist kein Bewertung, sondern **implizit**.
 - **Users:** Age von 0 bis 244, viele NULL; Location als Freitext
-- **Books:** mehrere ISBNs pro Werk (Auflagen!), Erscheinungsjahre 0 und 2050
+- **Books:** mehrere ISBNs pro Werk (Auflagen), Erscheinungsjahre 0 und 2050
 - **Technisch:** Semikolon-CSV, Latin-1, kaputte Escapes
 - **Sparsity:** 1,15 Mio. Ratings bei 278k × 271k möglichen Paaren
 
-## Ein Diagramm entlarvt die Daten
+
+## Visualisierung als erster Schritt in der Datenanalyse
 
 ![](images/alter_histogramm.png)
 
-- Altersangaben von 0 bis 244 — beim Alter wird gelogen (oder getippt)
 
 ## Exkurs: Was heißt Sparsity?
 
-- Denkbild: eine Tabelle mit einer Zeile pro Nutzer:in und einer Spalte pro Buch, in den Zellen die Bewertungen
-- 278.000 × 271.000 ≈ **75 Milliarden Zellen** — gefüllt sind ~1 Mio., also **0,002 %**
+- Die Tabelle ist fast leer.
+- Beispiel: eine Tabelle mit einer Zeile pro Nutzer:in und einer Spalte pro Buch, in den Zellen die Bewertungen
+- 278.000 × 271.000 ≈ **75 Milliarden Zellen** — gefüllt sind \~1 Mio., also **0,002 %**
 - Selbst die eifrigste Viel-Leserin füllt ihre Zeile zu weniger als 0,1 %
 
 ## Sparsity: die Folgen
@@ -116,20 +107,24 @@ Demos in diesem Deck nutzen ein Teilsample (~494.000 Bewertungen):
 - Zwei beliebige Nutzer:innen haben oft **kein einziges** gemeinsames Buch — Ähnlichkeit lässt sich gar nicht berechnen
 - Muster entstehen erst, weil sich Millionen fast leerer Zeilen überlagern
 
-## Kommt Ihnen das bekannt vor?
 
-- Werk vs. Manifestation → FRBR
-- Uneinheitliche Namen → Normdaten
-- Mehrfache ISBNs → Dublettenkontrolle
-- **Bibliothekar:innen haben hier Fachkompetenz, die Data-Science-Teams fehlt**
-- → Rolle: Subject Matter Expert
 
-## Zur Erinnerung: FRBR (Sie kennen das besser als ich)
+## FRBR und Sparsity
 
-- IFLA-Referenzmodell (1998, heute Teil des IFLA LRM): **Werk → Expression → Manifestation → Exemplar**
-- Am Beispiel: *The Green Mile* (Werk) → deutsche Übersetzung (Expression) → Signet-Taschenbuch mit eigener ISBN (Manifestation) → das Buch im Regal (Exemplar)
-- Book-Crossing kennt **nur ISBNs = Manifestationen** — das Werk müssen wir per Data Mining rekonstruieren
-- Genau das macht gleich das Record Linkage
+- Sparsity entsteht, weil Nutzer:innen zu wenige Bücher bewertet haben.
+- FRBR: dasselbe Werk taucht unter vielen ISBNs auf: Sparsity wird verschärft, weil wenige Bewertungen für ein Werk auf mehrere ISBNs verteilt werden
+- BookCrossing kennt **nur ISBNs = Manifestationen** — das Werk müssen wir per Data Mining rekonstruieren
+- Genau das macht Record Linkage (später)
+
+# Data Mining-Ansätze für den BookCrossing-Datensatz
+
+## Software
+
+- R: Programmiersprache und -umgebung von Statistikern für Statistiker, Open Source
+- RStudio: Integrierte Entwicklungsumgebung, kostenlos für viele Zwecke
+- Notebook im GitHub, kann mit der Software genutzt werden
+- Was ist ein Notebook?
+
 
 ## Wie würden Sie es lösen: Empfehlungen?
 
@@ -151,7 +146,7 @@ Demos in diesem Deck nutzen ein Teilsample (~494.000 Bewertungen):
   - Liegen auch dort in 7 % Chips → kein Zusammenhang, Chips sind einfach Chips
   - Liegen dort in **25 %** Chips → da ist etwas! Eine **Assoziation**
 
-## Vom Supermarkt zu Book-Crossing
+## Vom Supermarkt zu BookCrossing
 
 - Wer Buch A im Regal hat — welche Bücher stehen bei diesen Leser:innen überdurchschnittlich oft daneben?
 - Vorsicht: Eine Regel ist keine Kausalität (auch wenn Wein → Korkenzieher das vermuten lässt)
@@ -258,7 +253,7 @@ trans  <- as(koerbe, "transactions")
 ```{r}
 #| fig-height: 4
 itemFrequencyPlot(trans, topN = 10, cex.names = 0.6,
-                  main = "Häufigste Bücher im Book-Crossing-Datensatz")
+                  main = "Häufigste Bücher im BookCrossing-Datensatz")
 ```
 
 ## Apriori laufen lassen
@@ -288,7 +283,7 @@ DATAFRAME(head(sort(regeln, by = "lift"), 3)) %>%
 
 ## Was sehen wir?
 
-- Buchserien dominieren: Die Green-Mile-Bände sagen einander mit Konfidenz 1,0 voraus (Lift > 500)
+- Buchserien dominieren: Die Green-Mile-Bände sagen einander mit Konfidenz 1,0 voraus (Lift \> 500)
 - Der Algorithmus „kennt" weder Serien noch Genres — er findet sie in den Co-Occurrences
 - Aber: Die Top-Regel stützt sich auf 19 Personen — **wie belastbar ist das?**
 - Und: Hoher Support ≠ gute Empfehlung
@@ -336,7 +331,7 @@ DATAFRAME(head(sort(empf, by = "confidence"), 3)) %>%
   - Assoziationsregeln, Clustering, Netzwerkanalyse, Anomalieerkennung
 - **Überwacht** — aus Beispielen mit bekanntem Ergebnis lernen:
   - Klassifikation, Recommender mit Bewertungen
-- Alle folgenden Verfahren laufen auf demselben Book-Crossing-Datensatz
+- Alle folgenden Verfahren laufen auf demselben BookCrossing-Datensatz
 
 ## Wie würden Sie es lösen: persönliche Empfehlungen?
 
@@ -396,7 +391,7 @@ DATAFRAME(head(sort(empf, by = "confidence"), 3)) %>%
 - Ein Algorithmus, der das Konzept „Lehrkraft" gar nicht kennt, findet die zwei Gruppen trotzdem — allein über die Altersabstände
 - Mehr braucht es nicht: Abstände messen, Nahes zusammenfassen
 
-## Clustering: Welche Lesertypen stecken in Book-Crossing?
+## Clustering: Welche Lesertypen stecken in BookCrossing?
 
 - Wir beschreiben jede:n Nutzer:in mit vier Zahlen: Wie viele Bücher? Wie oft bewertet? Wie streng? Wie schwankend?
 - k-means findet vier Gruppen (Zahlen → Notebook):
@@ -417,7 +412,7 @@ DATAFRAME(head(sort(empf, by = "confidence"), 3)) %>%
 - Er hat tausende Mails gesehen, die Menschen vorher als Spam markiert haben
 - Das ist **überwachtes Lernen**: aus Fällen mit bekannter Antwort lernen, neue Fälle vorhersagen
 - Der Unterschied zum Clustering: Dort sucht der Algorithmus selbst nach Gruppen — hier geben wir die „richtige Antwort" zum Üben vor
-- Unsere Frage an Book-Crossing: **Wird diese Leserin dieses Buch mögen?**
+- Unsere Frage an BookCrossing: **Wird diese Leserin dieses Buch mögen?**
 
 ## Klassifikation: Der Entscheidungsbaum als Auskunftsgespräch
 
@@ -455,7 +450,7 @@ DATAFRAME(head(sort(empf, by = "confidence"), 3)) %>%
 ## Record Linkage: Wie der Computer Titel vergleicht
 
 - String-Ähnlichkeit: „the green mile" und „der green mile" teilen fast alle Buchstaben in fast derselben Reihenfolge — Ähnlichkeit fast 1
-- Aber: alle 271.000 Titel paarweise vergleichen wären ~37 Milliarden Vergleiche
+- Aber: alle 271.000 Titel paarweise vergleichen wären \~37 Milliarden Vergleiche
 - Der Trick (wie bei Apriori!): vorher grob aussieben — verglichen wird nur innerhalb desselben Autors (**Blocking**)
 - Ergebnis: Allein bei Stephen King fallen 77 Titelvarianten zu 35 Werken zusammen — im ganzen Datensatz stecken über 40.000 Mehrfach-ISBNs
 
@@ -512,15 +507,15 @@ DATAFRAME(head(sort(empf, by = "confidence"), 3)) %>%
 
 Alle sieben mit Code und Ergebnissen im Notebook:
 
-| Frage | Verfahren |
-|--------------------------------------|------------------------------|
-| Was wird zusammen gelesen? | Assoziationsregeln (Apriori) |
-| Was empfehle ich *dieser* Person? | Collaborative Filtering |
-| Welche Lesertypen gibt es? | Clustering |
-| Wird ein Buch gefallen? | Klassifikation |
-| Sind das Dubletten? | Record Linkage |
-| Was ist hier faul? | Anomalieerkennung |
-| Wie hängt alles zusammen? | Netzwerkanalyse |
+| Frage                             | Verfahren                    |
+|-----------------------------------|------------------------------|
+| Was wird zusammen gelesen?        | Assoziationsregeln (Apriori) |
+| Was empfehle ich *dieser* Person? | Collaborative Filtering      |
+| Welche Lesertypen gibt es?        | Clustering                   |
+| Wird ein Buch gefallen?           | Klassifikation               |
+| Sind das Dubletten?               | Record Linkage               |
+| Was ist hier faul?                | Anomalieerkennung            |
+| Wie hängt alles zusammen?         | Netzwerkanalyse              |
 
 ## Grenzen — Ihre Meinung?
 
