@@ -12,6 +12,8 @@ format:
 library(tidyverse)
 ```
 
+Bitte beachten Sie, dass Sie die Pfade ändern müssen zu dem Ort, wo Ihre Daten liegen:
+
 ```{r}
 library(readr)
 books <- read_delim("../statistik/data/Archiv/BX-Books.csv",

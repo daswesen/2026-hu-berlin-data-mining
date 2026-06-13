@@ -15,7 +15,7 @@ library(arules)
 library(tidyverse)
 ```
 
-# Konzepte klären
+
 
 ## Ziele dieser Konsultation
 
@@ -36,6 +36,8 @@ library(tidyverse)
 - **Fragen:** Bitte unterbrechen Sie mich für Fragen
 - **Kontakt:** [tom\@alby.de](mailto:tom@alby.de)
 - Material auf GitHub (Link im Moodle)
+
+# Konzepte klären
 
 ## Womit starten wir?
 
@@ -101,7 +103,7 @@ library(tidyverse)
 
 ## Sparsity: die Folgen
 
-- Selbst populäre Buchpaare tauchen nur in einem Promille der Körbe auf — Schwellenwerte müssen winzig sein
+- Selbst populäre Buchpaare tauchen nur in einem Promille der Warenkörbe auf — Schwellenwerte müssen winzig sein
 - Zwei beliebige Nutzer:innen haben oft **kein einziges** gemeinsames Buch — Ähnlichkeit lässt sich gar nicht berechnen
 - Muster entstehen erst, weil sich Millionen fast leerer Zeilen überlagern
 
@@ -181,20 +183,20 @@ tibble(
 
 ## Support: Lohnt sich die Regel überhaupt?
 
-- Wir zählen einfach: In wie vielen der 8 Körbe liegen *Angels & Demons* **und** *Da Vinci Code* zusammen?
+- Wir zählen einfach: In wie vielen der 8 Warenkörbe liegen *Angels & Demons* **und** *Da Vinci Code* zusammen?
 - In 4 von 8 → Support = **0,5**
 - Was fast nie vorkommt, ist kein Muster, sondern Zufall — und geschäftlich uninteressant
 
 ## Konfidenz: Wie verlässlich ist die Regel?
 
-- Jetzt schauen wir nur in die Körbe mit *Angels & Demons* — das sind 4
+- Jetzt schauen wir nur in die Warenkörbe mit *Angels & Demons* — das sind 4
 - In allen 4 liegt auch der *Da Vinci Code* → Konfidenz = **1,0**
 - Sprechweise: „Der Da Vinci Code taucht in 100 % der Fälle auf, in denen Angels & Demons auftaucht"
 - Achtung: Hat nichts mit den Konfidenzintervallen aus der Statistik zu tun!
 
 ## Lift: Mehr als nur Popularität?
 
-- Der *Da Vinci Code* liegt sowieso in 6 von 8 Körben — 75 %, ein Bestseller
+- Der *Da Vinci Code* liegt sowieso in 6 von 8 Warenkörben — 75 %, ein Bestseller
 - Bei den *Angels-&-Demons*-Leser:innen sind es aber 100 %
 - 100 % geteilt durch 75 % = Lift **1,33**: ein Drittel häufiger, als wenn die beiden Bücher nichts miteinander zu tun hätten
 - **Der Lift ist unser Bestseller-Detektor:** Bei „kaufen sowieso alle" bleibt er bei 1
@@ -224,7 +226,7 @@ DATAFRAME(regeln_mini) %>%
 ## Warum heißt das eigentlich „Apriori"?
 
 - Eigentlich müsste man jede Buchkombination mit jeder vergleichen — bei 271.000 Büchern hoffnungslos
-- Der Trick (Agrawal et al., 1994): **Was selten ist, fliegt früh raus** — samt aller Körbe und Kombinationen, in denen es steckt
+- Der Trick (Agrawal et al., 1994): **Was selten ist, fliegt früh raus** — samt aller Warenkörbe und Kombinationen, in denen es steckt
 - Die Logik dahinter: Wenn schon {A, B} selten ist, kann {A, B, C} unmöglich häufig sein
 - Das weiß der Algorithmus *a priori* — vor dem Nachzählen
 
@@ -256,8 +258,8 @@ trans  <- as(koerbe, "transactions")
 ```
 
 - Transaktion = alle Bücher, die ein:e Nutzer:in erfasst hat (auch implizite 0-Ratings: erfasst = gelesen)
-- `r format(nrow(ratings), big.mark = ".")` Bewertungen → `r format(length(koerbe), big.mark = ".")` Körbe mit mindestens 2 Büchern
-- Vorarbeit aus der Datenqualitäts-Übung: ISBN-Dubletten entfernt, ein Korb pro Person dedupliziert
+- `r format(nrow(ratings), big.mark = ".")` Bewertungen → `r format(length(koerbe), big.mark = ".")` Warenkörbe mit mindestens 2 Büchern
+- Vorarbeit aus der Datenqualitäts-Übung: ISBN-Dubletten entfernt, ein "Warenkorb" pro Person dedupliziert
 
 ## Welche Bücher dominieren?
 
@@ -331,7 +333,7 @@ DATAFRAME(head(sort(empf, by = "confidence"), 3)) %>%
 
 - `supp = 0.001` — bei 271.000 Büchern muss der Support winzig sein (Sparsity), sonst findet Apriori nichts
 - Zu winzig → Regeln auf einer Handvoll Fälle; `count` immer mitlesen
-- Ohne `unique()` je Korb und ISBN-Deduplizierung: Empfehlung = dasselbe Buch in anderer Auflage
+- Ohne `unique()` je Warenkorb und ISBN-Deduplizierung: Empfehlung = dasselbe Buch in anderer Auflage
 - Komplette Pipeline zum Nachrechnen: → Notebook
 
 # Über Apriori hinaus: die Data-Mining-Werkzeugkiste
@@ -373,6 +375,28 @@ DATAFRAME(head(sort(empf, by = "confidence"), 3)) %>%
 - Hier schlägt die Sparsity zu: fast leere Zeilen kann man nicht vergleichen
 - Deshalb erst eindampfen — übrig bleiben 743 aktive Leser:innen × 477 populäre Bücher
 
+## Collaborative Filtering: Wie es funktioniert (IBCF)
+
+- Dieselbe Tabelle — aber jetzt vergleichen wir **Spalten** (Bücher), nicht Zeilen
+- Schritt 1: Berechne für jedes Buchpaar eine Ähnlichkeit — Bücher sind ähnlich, wenn ihr gemeinsames Bewertungsprofil übereinstimmt
+- Schritt 2: Empfohlen werden die Bücher, die Ihren Favoriten am ähnlichsten sind — die Sie aber noch nicht bewertet haben
+- Kein Blick auf andere Nutzer:innen — nur auf die Ähnlichkeit zwischen Büchern
+
+## IBCF: Ein Beispiel
+
+| | Da Vinci | Angels | Life of Pi | Harry Potter |
+|---|---|---|---|---|
+| A | 8 | 9 | — | 7 |
+| B | 7 | 8 | 6 | — |
+| C | **9** | ? | — | **8** |
+| D | — | — | 9 | — |
+| E | 6 | 7 | — | 6 |
+
+- „Da Vinci" und „Angels": überall wo beide bewertet wurden, liegen die Zahlen nah beieinander → hohe Ähnlichkeit
+- „Da Vinci" und „Life of Pi": nur B hat beide bewertet → kaum Überlappung → niedrige Ähnlichkeit
+- Nutzerin C hat Da Vinci (9) gut gefunden → Angels wird empfohlen, weil es Da Vinci am ähnlichsten ist
+- Kein Schritt hat gefragt: „Wer hat ähnlichen Geschmack wie C?" — das wäre UBCF
+
 ## Collaborative Filtering: Funktioniert das wirklich?
 
 - Der Test funktioniert wie in der Schule: Wir verstecken einen Teil der Bewertungen und lassen das Verfahren raten
@@ -384,7 +408,7 @@ DATAFRAME(head(sort(empf, by = "confidence"), 3)) %>%
 
 - Drei Kandidaten treten an:
   - **UBCF** — empfiehlt über ähnliche *Personen* („Geschmacksnachbarn")
-  - **IBCF** — empfiehlt über ähnliche *Bücher* („wer dieses mochte, mochte auch …")
+  - **IBCF** — empfiehlt über ähnliche *Bücher* (Bücher, die von denselben Menschen ähnlich bewertet wurden)
   - **RANDOM** — würfelt (unsere Untergrenze)
 - Zwei Achsen:
   - Nach oben (**TPR**): Wie viele der versteckten Lieblingsbücher wurden gefunden?
@@ -566,7 +590,7 @@ DATAFRAME(head(sort(empf, by = "confidence"), 3)) %>%
 - Apriori personalisiert nicht: globale Regeln, kein individuelles Profil
 - Cold Start: neue Bücher ohne Bewertungen bleiben unsichtbar
 - Feedback-Schleife: Häufiges wird noch häufiger
-- **Wollen Bibliotheken Filterblasen — oder ist Serendipität ein Bibliothekswert?**
+- Filterblasen oder Serendipität?
 - **Dürfen wir Ausleihdaten so nutzen? Was unterscheidet uns von Amazon?**
 
 ## Evaluation (wenn Zeit)
