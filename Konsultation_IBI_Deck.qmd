@@ -80,7 +80,7 @@ library(tidyverse)
 
 ![](images/CRISP-DM_Process_Diagram.png)
 
-## Was stimmt mit diesen Daten nicht?
+## Was stimmt im BookCrossings-Daten nicht?
 
 - **Ratings:** 0 ist kein Bewertung, sondern **implizit**.
 - **Users:** Age von 0 bis 244, viele NULL; Location als Freitext
@@ -88,11 +88,9 @@ library(tidyverse)
 - **Technisch:** Semikolon-CSV, Latin-1, kaputte Escapes
 - **Sparsity:** 1,15 Mio. Ratings bei 278k × 271k möglichen Paaren
 
-
 ## Visualisierung als erster Schritt in der Datenanalyse
 
 ![](images/alter_histogramm.png)
-
 
 ## Exkurs: Was heißt Sparsity?
 
@@ -106,8 +104,6 @@ library(tidyverse)
 - Selbst populäre Buchpaare tauchen nur in einem Promille der Körbe auf — Schwellenwerte müssen winzig sein
 - Zwei beliebige Nutzer:innen haben oft **kein einziges** gemeinsames Buch — Ähnlichkeit lässt sich gar nicht berechnen
 - Muster entstehen erst, weil sich Millionen fast leerer Zeilen überlagern
-
-
 
 ## FRBR und Sparsity
 
@@ -124,7 +120,6 @@ library(tidyverse)
 - RStudio: Integrierte Entwicklungsumgebung, kostenlos für viele Zwecke
 - Notebook im GitHub, kann mit der Software genutzt werden
 - Was ist ein Notebook?
-
 
 ## Wie würden Sie es lösen: Empfehlungen?
 
@@ -151,11 +146,10 @@ library(tidyverse)
 - Wer Buch A im Regal hat — welche Bücher stehen bei diesen Leser:innen überdurchschnittlich oft daneben?
 - Vorsicht: Eine Regel ist keine Kausalität (auch wenn Wein → Korkenzieher das vermuten lässt)
 
-## Von Hand: 8 Leser:innen
-
-Jede Zeile ist ein:e Leser:in mit ihrem „Bücherregal" — wie 8 Kassenbons an der Supermarktkasse:
+## Von Hand: 8 Leser:innen — je ein „Bücherregal"
 
 ```{r}
+#| include: false
 mini <- list(
   u1 = c("Da Vinci Code", "Angels & Demons"),
   u2 = c("Da Vinci Code", "Angels & Demons", "Life of Pi"),
@@ -166,6 +160,23 @@ mini <- list(
   u7 = c("Angels & Demons", "Da Vinci Code"),
   u8 = c("Life of Pi", "Bridget Jones")
 )
+```
+
+```{r}
+#| echo: false
+tibble(
+  `Leser:in` = paste0("U", 1:8),
+  `Bücherregal` = c(
+    "Da Vinci Code, Angels & Demons",
+    "Da Vinci Code, Angels & Demons, Life of Pi",
+    "Da Vinci Code, Life of Pi",
+    "Angels & Demons, Da Vinci Code",
+    "Life of Pi",
+    "Da Vinci Code",
+    "Angels & Demons, Da Vinci Code",
+    "Life of Pi, Bridget Jones"
+  )
+) %>% knitr::kable()
 ```
 
 ## Support: Lohnt sich die Regel überhaupt?
@@ -278,7 +289,7 @@ DATAFRAME(head(sort(regeln, by = "lift"), 3)) %>%
             Konfidenz = round(confidence, 2),
             Lift = round(lift, 0),
             Personen = count) %>%
-  knitr::kable()
+  knitr::kable(row.names = FALSE)
 ```
 
 ## Was sehen wir?
@@ -297,7 +308,7 @@ length(subset(regeln, lhs %in% "Wild Animus" & size(lhs) == 1))
 ```
 
 - In fast 5 % aller Körbe — und trotzdem folgt aus „hat Wild Animus" *allein* keine einzige verlässliche Regel
-- Zum Vergleich: Bei Green Mile reichte ein einziger Band — **Popularität ist kein Muster**
+- **Popularität ist kein Muster**
 
 ## Empfehlung konkret
 
@@ -313,7 +324,7 @@ DATAFRAME(head(sort(empf, by = "confidence"), 3)) %>%
   transmute(`Wer das gelesen hat ...` = str_trunc(as.character(LHS), 55),
             `... bekommt empfohlen` = str_trunc(as.character(RHS), 35),
             Konfidenz = round(confidence, 2)) %>%
-  knitr::kable()
+  knitr::kable(row.names = FALSE)
 ```
 
 ## Stellschrauben & Stolpersteine
@@ -337,19 +348,26 @@ DATAFRAME(head(sort(empf, by = "confidence"), 3)) %>%
 
 - Apriori liefert eine Regel für alle — jetzt soll es persönlich werden
 - Aufgabe: Eine Empfehlung speziell für Nutzerin 198711, nur aus den Bewertungsdaten
-- **Wie würden Sie ihren Geschmack fassen — und mit wem vergleichen?**
+- **Wie würden Sie ihren Geschmack erfassen — und mit wem vergleichen?**
 
 ## Collaborative Filtering: Wie macht Spotify das?
 
-- Die Charts gefallen Ihnen nicht — und trotzdem trifft Spotify Ihren Geschmack. Wie?
+- Die Charts gefallen Ihnen nicht, Spotify trifft dennoch Ihren Geschmack. Wie?
 - Nicht über den Inhalt: Der Algorithmus weiß nicht, was ein Genre ist
-- Sondern über **Geschmacksnachbarn**: Menschen, die bisher ähnlich bewertet haben wie Sie
+- **Geschmacksnachbarn**: Menschen, die bisher ähnlich bewertet haben wie Sie
 - Was die mochten und Sie noch nicht kennen — das ist Ihre Empfehlung
 - Unterschied zu Apriori: nicht *eine* Regel für alle, sondern eine **persönliche** Liste
 
-## Collaborative Filtering: Wie es funktioniert
+## Collaborative Filtering: Zwei Varianten
 
-- Wieder die große Tabelle: eine Zeile pro Nutzer:in, eine Spalte pro Buch, in den Zellen die Noten
+- **UBCF — User-Based:** Finde Nutzer:innen, die ähnlich bewertet haben wie du → übernimm ihre Favoriten
+- **IBCF — Item-Based:** Finde Bücher, die ähnlich bewertet wurden wie deine Favoriten → empfehle die nächsten
+- Beide nutzen dieselbe Tabelle — UBCF vergleicht Zeilen, IBCF vergleicht Spalten
+- Welcher Ansatz besser ist, hängt vom Datensatz ab — deshalb testen wir beide
+
+## Collaborative Filtering: Wie es funktioniert (UBCF)
+
+- Die große Tabelle: eine Zeile pro Nutzer:in, eine Spalte pro Buch, in den Zellen die Noten
 - Schritt 1: Finde die Zeilen, die Ihrer Zeile am ähnlichsten sind
 - Schritt 2: Was steht dort gut bewertet, fehlt aber bei Ihnen? → Empfehlung
 - Hier schlägt die Sparsity zu: fast leere Zeilen kann man nicht vergleichen
@@ -371,13 +389,24 @@ DATAFRAME(head(sort(empf, by = "confidence"), 3)) %>%
 - Zwei Achsen:
   - Nach oben (**TPR**): Wie viele der versteckten Lieblingsbücher wurden gefunden?
   - Nach rechts (**FPR**): Wie viele Empfehlungen waren daneben?
-- Gut ist: viel nach oben, wenig nach rechts — also eine Kurve, die über der Diagonale liegt
 
 ## Der Test im Bild
 
 ![](images/roc_cf.png)
 
-- Beide Verfahren liegen deutlich über der Zufallslinie — besser als Raten sollte jedes Empfehlungssystem sein
+## Was bedeuten die Abkürzungen?
+
+- **ROC** — Receiver Operating Characteristic: wie gut trennt ein Verfahren Treffer von Fehlern?
+- **TPR** — True Positive Rate: Anteil der Lieblingsbücher, die das System gefunden hat
+- **FPR** — False Positive Rate: Anteil der Empfehlungen, die daneben lagen
+- Eine perfekte Kurve schmiegt sich an die obere linke Ecke — viel TPR, kaum FPR
+
+## Was sehen wir im Bild?
+
+- UBCF und IBCF liegen bei wenigen Empfehlungen (N=1, 5) über der Diagonale — sie treffen öfter als Zufall
+- Zufall liegt darunter: er empfiehlt gleichmäßig, die Testbücher sind aber nicht gleichmäßig verteilt
+- UBCF und IBCF greifen bevorzugt auf viel bewertete Bücher zurück — und treffen den Test-Pool deshalb öfter
+- Alle Werte sind winzig (max. \~2 %): selbst das beste Verfahren findet nur einen Bruchteil der versteckten Bücher — das ist Sparsity
 
 ## Wie würden Sie es lösen: Lesertypen?
 
@@ -391,6 +420,22 @@ DATAFRAME(head(sort(empf, by = "confidence"), 3)) %>%
 - Ein Algorithmus, der das Konzept „Lehrkraft" gar nicht kennt, findet die zwei Gruppen trotzdem — allein über die Altersabstände
 - Mehr braucht es nicht: Abstände messen, Nahes zusammenfassen
 
+## k-Means: So funktioniert der Algorithmus
+
+- **Schritt 1:** Setze k Zufallspunkte ins Koordinatensystem — die ersten Centroids
+- **Schritt 2:** Weise jeden Datenpunkt dem nächsten Centroid zu
+- **Schritt 3:** Verschiebe jeden Centroid in die Mitte seiner Gruppe
+- **Schritt 4:** Wiederhole Schritte 2–3, bis sich nichts mehr ändert
+- Das k muss man selbst wählen — k=4 heißt: „Ich erwarte vier Lesertypen"
+
+## Zufälliges Platzieren der Centroids
+
+![](images/07_007.png)
+
+## Neuberechnung der Abstände
+
+![](images/07_008.png)
+
 ## Clustering: Welche Lesertypen stecken in BookCrossing?
 
 - Wir beschreiben jede:n Nutzer:in mit vier Zahlen: Wie viele Bücher? Wie oft bewertet? Wie streng? Wie schwankend?
@@ -401,7 +446,7 @@ DATAFRAME(head(sort(empf, by = "confidence"), 3)) %>%
   - Die **stillen Sammler:innen** — erfassen viel, bewerten kaum
 - Die Namen stammen von mir, nicht vom Algorithmus — **deuten muss der Mensch**
 
-## Wie würden Sie es lösen: Gefällt das Buch?
+## Wie würden Sie es lösen: Wird das Buch gefallen?
 
 - Aufgabe: Sagen Sie vorher, ob eine Leserin ein Buch mit 7+ benoten wird
 - Zur Verfügung stehen nur: ihr Alter, das Erscheinungsjahr, die Popularität des Buchs
@@ -421,11 +466,16 @@ DATAFRAME(head(sort(empf, by = "confidence"), 3)) %>%
 - Gelernt werden die Fragen aus den Beispielen: Der Baum wählt selbst, welche Frage am besten trennt
 - Großer Vorteil gegenüber „Black Boxes": Man kann den Baum **lesen** und Betroffenen erklären
 
+## Entscheidungsbaum: Wie wählt der Algo die Frage?
+
+- Bei jeder Verzweigung probiert der Algorithmus **alle möglichen Schnitte** durch die Daten
+- Gewählt wird der Schnitt, der die entstehenden Gruppen am **reinsten** macht — möglichst alle „mag" auf einer Seite, alle „mag nicht" auf der anderen
+- Maß dafür: der Gini-Index — je homogener eine Gruppe, desto besser
+- Der Baum wächst Ast für Ast, bis jede Gruppe rein genug ist oder zu wenige Fälle enthält
+
 ## So sieht unser Baum aus
 
 ![](images/entscheidungsbaum.png)
-
-- Jede Verzweigung ist eine Frage, jedes Blatt eine Vorhersage — den kann man Betroffenen zeigen
 
 ## Klassifikation: Die 77-Prozent-Falle
 
@@ -477,8 +527,6 @@ DATAFRAME(head(sort(empf, by = "confidence"), 3)) %>%
 
 ![](images/popularitaet_vs_note.png)
 
-- Jeder Punkt ein Buch — rechts unten, allein: *Wild Animus*
-
 ## Wie würden Sie es lösen: das große Ganze zeigen?
 
 - Aufgabe: Zeigen Sie einer Kollegin *auf einen Blick*, welche Bücher zusammengehören
@@ -492,9 +540,7 @@ DATAFRAME(head(sort(empf, by = "confidence"), 3)) %>%
 
 ## Die Karte
 
-![](images/netzwerk.png)
-
-- Jeder Punkt ein Buch, jede Linie gemeinsame Leser:innen — die Farben sind die automatisch gefundenen Gruppen
+![](images/co-occurence.png)
 
 ## Netzwerkanalyse: Was die Karte zeigt
 
@@ -503,9 +549,7 @@ DATAFRAME(head(sort(empf, by = "confidence"), 3)) %>%
 - Niemand hat dem System Genres beigebracht: **Die Leser:innen haben die Karte gezeichnet**
 - Dieselbe Information wie bei Apriori — als Bild statt als Regelliste
 
-## Welches Verfahren für welche Frage?
-
-Alle sieben mit Code und Ergebnissen im Notebook:
+## Welches Verfahren für welche Frage? — alle sieben im Notebook
 
 | Frage                             | Verfahren                    |
 |-----------------------------------|------------------------------|
@@ -536,5 +580,3 @@ Alle sieben mit Code und Ergebnissen im Notebook:
 ## Zum Abschluss
 
 - Eine Sache, die heute hängen geblieben ist?
-- Materialien: Ablaufplan, Quarto-Notebook mit allem Code
-- **Kontakt:** [tom\@alby.de](mailto:tom@alby.de)

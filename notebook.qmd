@@ -5,6 +5,7 @@ format:
     df-print: paged
     toc: true
     toc-depth: 2
+    embed-resources: true
 ---
 
 ```{r}
@@ -304,7 +305,7 @@ ergebnis <- evaluate(schema, algos, type = "topNList", n = c(1, 5, 10))
 plot(ergebnis, annotate = TRUE)
 ```
 
-**Ergebnis:** Der Test funktioniert so: Ein Teil der Noten wird versteckt,
+**Ergebnis:** Der Test funktioniert so: Ein Teil der Bewertungen wird versteckt,
 das Verfahren muss sie erraten. Zum Lesen des Diagramms: Die senkrechte
 Achse (TPR, True Positive Rate) zeigt, wie viele der versteckten
 Lieblingsbücher gefunden wurden; die waagerechte Achse (FPR, False Positive
